@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-
+    if: false  # GitHub Pages not configured for this repository
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
