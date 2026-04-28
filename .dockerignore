@@ -19,5 +19,3 @@ coverage
 README.md
 LICENSE
 .editorconfig
-tsconfig.json
-playwright.config.ts
