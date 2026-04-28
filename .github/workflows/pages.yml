@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -20,10 +20,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: false  # GitHub Pages not configured for this repository
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -47,9 +43,9 @@ jobs:
 
       - name: Build Report Index
         run: |
-          mkdir -p playwright-report
+          mkdir -p docs
 
-          cat > playwright-report/index.html << 'EOF'
+          cat > docs/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -198,14 +194,19 @@ jobs:
 
           echo "✅ Report index created"
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'playwright-report'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Commit and Push to Main
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'completed'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Actions"
+          
+          # Add docs folder
+          git add docs/
+          
+          # Check if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: Update test report - $(date +'%Y-%m-%d %H:%M:%S')"
+            git push origin main
+          fi
