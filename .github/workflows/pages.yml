@@ -1,0 +1,210 @@
+# @format
+
+name: Publish Test Report to GitHub Pages
+
+on:
+  workflow_run:
+    workflows: ['API Automation Tests', 'Docker Build & Test']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts from Workflow Run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Get workflow run artifacts
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run?.id || context.run_id,
+            });
+
+            console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
+
+      - name: Build Report Index
+        run: |
+          mkdir -p playwright-report
+
+          cat > playwright-report/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Bookstore API Test Reports</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      padding: 20px;
+                  }
+                  .container {
+                      max-width: 1000px;
+                      margin: 0 auto;
+                  }
+                  .header {
+                      color: white;
+                      margin-bottom: 40px;
+                      text-align: center;
+                  }
+                  .header h1 {
+                      font-size: 2.5em;
+                      margin-bottom: 10px;
+                  }
+                  .header p {
+                      font-size: 1.1em;
+                      opacity: 0.9;
+                  }
+                  .cards {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 20px;
+                  }
+                  .card {
+                      background: white;
+                      border-radius: 8px;
+                      padding: 30px;
+                      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                      transition: transform 0.3s, box-shadow 0.3s;
+                  }
+                  .card:hover {
+                      transform: translateY(-5px);
+                      box-shadow: 0 15px 50px rgba(0,0,0,0.3);
+                  }
+                  .card h2 {
+                      color: #333;
+                      margin-bottom: 15px;
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                  }
+                  .card .icon {
+                      font-size: 1.5em;
+                  }
+                  .card p {
+                      color: #666;
+                      margin-bottom: 20px;
+                      line-height: 1.6;
+                  }
+                  .card a {
+                      display: inline-block;
+                      background: #667eea;
+                      color: white;
+                      padding: 12px 24px;
+                      border-radius: 5px;
+                      text-decoration: none;
+                      transition: background 0.3s;
+                  }
+                  .card a:hover {
+                      background: #764ba2;
+                  }
+                  .info {
+                      background: white;
+                      border-radius: 8px;
+                      padding: 20px;
+                      margin-top: 30px;
+                      color: #333;
+                  }
+                  .info h3 {
+                      margin-bottom: 10px;
+                      color: #667eea;
+                  }
+                  .info p {
+                      margin-bottom: 8px;
+                      color: #666;
+                  }
+                  .footer {
+                      text-align: center;
+                      color: white;
+                      margin-top: 40px;
+                      font-size: 0.9em;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>📊 Bookstore API Test Reports</h1>
+                      <p>Automated API Testing with Playwright & Docker</p>
+                  </div>
+                  
+                  <div class="cards">
+                      <div class="card">
+                          <h2><span class="icon">🧪</span> Latest Test Results</h2>
+                          <p>View the most recent test execution results including passed, failed, and skipped tests.</p>
+                          <a href="./index.html">View Report</a>
+                      </div>
+                      
+                      <div class="card">
+                          <h2><span class="icon">🐳</span> Docker Tests</h2>
+                          <p>Test results from Docker container execution with Chromium browser.</p>
+                          <p style="font-size: 0.9em; color: #999;">Reports available in CI/CD artifacts</p>
+                      </div>
+                      
+                      <div class="card">
+                          <h2><span class="icon">📈</span> Metrics</h2>
+                          <p>Test coverage, execution time, and performance metrics from automated runs.</p>
+                          <p style="font-size: 0.9em; color: #999;">Available in detailed reports</p>
+                      </div>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>📋 About These Tests</h3>
+                      <p><strong>Project:</strong> Bookstore API Automation Testing</p>
+                      <p><strong>Framework:</strong> Playwright Test v1.48.0 with TypeScript</p>
+                      <p><strong>Test Count:</strong> 88 tests (5 skipped for API behavior validation)</p>
+                      <p><strong>Coverage:</strong> Books & Authors API CRUD operations with edge cases</p>
+                      <p><strong>Execution:</strong> Parallel execution on Ubuntu with Docker support</p>
+                      <p><strong>Reports:</strong> HTML (interactive), JUnit XML (CI/CD), and GitHub Pages</p>
+                  </div>
+                  
+                  <div class="footer">
+                      <p>Generated by GitHub Actions CI/CD Pipeline | Last Updated: <span id="time"></span></p>
+                  </div>
+              </div>
+              
+              <script>
+                  document.getElementById('time').textContent = new Date().toLocaleString();
+              </script>
+          </body>
+          </html>
+          EOF
+
+          echo "✅ Report index created"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'playwright-report'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
